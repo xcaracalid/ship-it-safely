@@ -1,0 +1,362 @@
+{
+  "project": {
+    "id": 42,
+    "name": "Demo Project",
+    "organisation": 1,
+    "hide_disabled_flags": false,
+    "enable_dynamo_db": false
+  },
+  "environments": [
+    {
+      "id": 101,
+      "name": "Development",
+      "api_key": "dev-key-redacted",
+      "project": 42,
+      "is_server_key_only": false,
+      "allow_client_traits": true,
+      "hide_disabled_flags": false,
+      "updated_at": "2026-11-25T17:40:12Z"
+    },
+    {
+      "id": 102,
+      "name": "Production",
+      "api_key": "prod-key-redacted",
+      "project": 42,
+      "is_server_key_only": false,
+      "allow_client_traits": true,
+      "hide_disabled_flags": false,
+      "updated_at": "2026-11-25T17:40:12Z"
+    }
+  ],
+  "segments": [
+    {
+      "id": 201,
+      "name": "beta_testers",
+      "project": 42,
+      "description": "Internal beta cohort",
+      "rules": []
+    }
+  ],
+  "flags": [
+    {
+      "id": 10714,
+      "name": "legacy_banner",
+      "description": "Old marketing banner scheduled for removal after the Q4 campaign ends and the design team signs off on the replacement artwork.",
+      "enabled": true,
+      "default_enabled": true,
+      "type": "STANDARD",
+      "variants": [],
+      "tags": [
+        {
+          "id": 1,
+          "label": "release",
+          "color": "#6837FC"
+        }
+      ],
+      "created_at": "2026-11-20T09:14:00Z",
+      "updated_at": "2026-11-25T17:40:12Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [
+        {
+          "id": 7,
+          "email": "demo.user@example.com",
+          "first_name": "Demo",
+          "last_name": "User"
+        }
+      ],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 58598,
+      "name": "search_v2",
+      "description": "Elasticsearch-backed search rollout, phase 2 of the search platform migration including relevance tuning and fallback to the legacy index.",
+      "enabled": true,
+      "default_enabled": true,
+      "type": "MULTIVARIATE",
+      "variants": [
+        {
+          "key": "control",
+          "value": "control",
+          "weight": 80
+        },
+        {
+          "key": "new",
+          "value": "new",
+          "weight": 20
+        }
+      ],
+      "tags": [
+        {
+          "id": 1,
+          "label": "release",
+          "color": "#6837FC"
+        }
+      ],
+      "created_at": "2026-11-20T09:14:00Z",
+      "updated_at": "2026-11-25T17:40:12Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [
+        {
+          "key": "control",
+          "value": "control",
+          "weight": 80
+        },
+        {
+          "key": "new",
+          "value": "new",
+          "weight": 20
+        }
+      ],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [
+        {
+          "id": 7,
+          "email": "demo.user@example.com",
+          "first_name": "Demo",
+          "last_name": "User"
+        }
+      ],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 56779,
+      "name": "dark_mode",
+      "description": "Dark mode theme for the web app, gated while the design system team finishes contrast fixes on the settings pages.",
+      "enabled": false,
+      "default_enabled": false,
+      "type": "STANDARD",
+      "variants": [],
+      "tags": [
+        {
+          "id": 1,
+          "label": "release",
+          "color": "#6837FC"
+        }
+      ],
+      "created_at": "2026-11-20T09:14:00Z",
+      "updated_at": "2026-11-25T17:40:12Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [
+        {
+          "id": 7,
+          "email": "demo.user@example.com",
+          "first_name": "Demo",
+          "last_name": "User"
+        }
+      ],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 40845,
+      "name": "payments_retry",
+      "description": "Automatic retry with exponential backoff for failed card payments, coordinated with the payments provider's idempotency guarantees.",
+      "enabled": true,
+      "default_enabled": true,
+      "type": "STANDARD",
+      "variants": [],
+      "tags": [
+        {
+          "id": 1,
+          "label": "release",
+          "color": "#6837FC"
+        }
+      ],
+      "created_at": "2026-11-20T09:14:00Z",
+      "updated_at": "2026-11-25T17:40:12Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [
+        {
+          "id": 7,
+          "email": "demo.user@example.com",
+          "first_name": "Demo",
+          "last_name": "User"
+        }
+      ],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 34834,
+      "name": "onboarding_flow",
+      "description": "New three-step onboarding flow replacing the legacy five-step wizard, instrumented for funnel comparison against the old flow.",
+      "enabled": true,
+      "default_enabled": true,
+      "type": "MULTIVARIATE",
+      "variants": [
+        {
+          "key": "control",
+          "value": "control",
+          "weight": 50
+        },
+        {
+          "key": "new",
+          "value": "new",
+          "weight": 50
+        }
+      ],
+      "tags": [
+        {
+          "id": 1,
+          "label": "release",
+          "color": "#6837FC"
+        }
+      ],
+      "created_at": "2026-11-20T09:14:00Z",
+      "updated_at": "2026-11-25T17:40:12Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [
+        {
+          "key": "control",
+          "value": "control",
+          "weight": 50
+        },
+        {
+          "key": "new",
+          "value": "new",
+          "weight": 50
+        }
+      ],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [
+        {
+          "id": 7,
+          "email": "demo.user@example.com",
+          "first_name": "Demo",
+          "last_name": "User"
+        }
+      ],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 4830,
+      "name": "audit_logging",
+      "description": "Verbose audit logging for admin actions, kept on in production for compliance evidence retention.",
+      "enabled": true,
+      "default_enabled": true,
+      "type": "STANDARD",
+      "variants": [],
+      "tags": [
+        {
+          "id": 1,
+          "label": "release",
+          "color": "#6837FC"
+        }
+      ],
+      "created_at": "2026-11-20T09:14:00Z",
+      "updated_at": "2026-11-25T17:40:12Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [
+        {
+          "id": 7,
+          "email": "demo.user@example.com",
+          "first_name": "Demo",
+          "last_name": "User"
+        }
+      ],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 29236,
+      "name": "new_checkout",
+      "description": "New streamlined checkout flow",
+      "enabled": true,
+      "default_enabled": false,
+      "type": "MULTIVARIATE",
+      "variants": [
+        {
+          "key": "control",
+          "value": "control",
+          "weight": 0
+        },
+        {
+          "key": "new",
+          "value": "new",
+          "weight": 100
+        }
+      ],
+      "tags": [],
+      "created_at": "2026-11-26T00:00:00Z",
+      "updated_at": "2026-11-26T00:00:00Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [],
+      "grouped_feature_states": [],
+      "external_resources": []
+    },
+    {
+      "id": 78163,
+      "name": "risky_pricing",
+      "description": "Experimental dynamic pricing",
+      "enabled": false,
+      "default_enabled": false,
+      "type": "MULTIVARIATE",
+      "variants": [
+        {
+          "key": "control",
+          "value": "control",
+          "weight": 100
+        },
+        {
+          "key": "new",
+          "value": "new",
+          "weight": 0
+        }
+      ],
+      "tags": [],
+      "created_at": "2026-11-26T00:00:00Z",
+      "updated_at": "2026-11-26T00:00:00Z",
+      "created_by": "demo.user@example.com",
+      "project": 42,
+      "multivariate_feature_state_values": [],
+      "feature_state_value": null,
+      "is_archived": false,
+      "is_server_key_only": false,
+      "hide_disabled_flags": false,
+      "owners": [],
+      "grouped_feature_states": [],
+      "external_resources": []
+    }
+  ]
+}

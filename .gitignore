@@ -1,0 +1,4 @@
+demo/.mock-state.json
+demo/runs/
+.env
+__pycache__/

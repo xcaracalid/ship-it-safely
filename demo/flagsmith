@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""Mock `flagsmith` CLI for the ship-it-safely demo.
+
+Implements the subset of the real Flagsmith CLI v2 surface that the skill
+uses, backed by a JSON state file, so the full ship workflow can be replayed
+and recorded without a Flagsmith account:
+
+  auth status | environment list | project list | segment list
+  flag list | flag get <name> | flag update <name> --weight k=v |
+  flag enable <name> | flag disable <name>
+  feature create <name> --value v --enabled=false --description d
+  feature variant add <name> --value v --key k --weight n
+  eval <name> --test        (exit 1 when the flag resolves disabled)
+
+Supports --json everywhere and --jq <expr> (uses a real `jq` binary when one
+is on PATH; otherwise a tiny subset: map({...}), .[].field, length).
+State lives in $MOCK_FLAGSMITH_STATE or demo/.mock-state.json.
+"""
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATE_PATH = os.environ.get("MOCK_FLAGSMITH_STATE", os.path.join(HERE, ".mock-state.json"))
+
+
+def seed_state():
+    def flag(name, desc, enabled, variants):
+        return {
+            "id": abs(hash(name)) % 90000 + 1000,
+            "name": name,
+            "description": desc,
+            "enabled": enabled,
+            "default_enabled": enabled,
+            "type": "MULTIVARIATE" if variants else "STANDARD",
+            "variants": variants,
+            "tags": [{"id": 1, "label": "release", "color": "#6837FC"}],
+            "created_at": "2026-11-20T09:14:00Z",
+            "updated_at": "2026-11-25T17:40:12Z",
+            "created_by": "demo.user@example.com",
+            "project": 42,
+            "multivariate_feature_state_values": variants,
+            "feature_state_value": None,
+            "is_archived": False,
+            "is_server_key_only": False,
+            "hide_disabled_flags": False,
+            "owners": [{"id": 7, "email": "demo.user@example.com", "first_name": "Demo", "last_name": "User"}],
+            "grouped_feature_states": [],
+            "external_resources": [],
+        }
+
+    return {
+        "project": {"id": 42, "name": "Demo Project", "organisation": 1,
+                    "hide_disabled_flags": False, "enable_dynamo_db": False},
+        "environments": [
+            {"id": 101, "name": "Development", "api_key": "dev-key-redacted",
+             "project": 42, "is_server_key_only": False, "allow_client_traits": True,
+             "hide_disabled_flags": False, "updated_at": "2026-11-25T17:40:12Z"},
+            {"id": 102, "name": "Production", "api_key": "prod-key-redacted",
+             "project": 42, "is_server_key_only": False, "allow_client_traits": True,
+             "hide_disabled_flags": False, "updated_at": "2026-11-25T17:40:12Z"},
+        ],
+        "segments": [
+            {"id": 201, "name": "beta_testers", "project": 42,
+             "description": "Internal beta cohort", "rules": []},
+        ],
+        "flags": [
+            flag("legacy_banner", "Old marketing banner scheduled for removal after the Q4 campaign ends and the design team signs off on the replacement artwork.", True, []),
+            flag("search_v2", "Elasticsearch-backed search rollout, phase 2 of the search platform migration including relevance tuning and fallback to the legacy index.", True,
+                 [{"key": "control", "value": "control", "weight": 80},
+                  {"key": "new", "value": "new", "weight": 20}]),
+            flag("dark_mode", "Dark mode theme for the web app, gated while the design system team finishes contrast fixes on the settings pages.", False, []),
+            flag("payments_retry", "Automatic retry with exponential backoff for failed card payments, coordinated with the payments provider's idempotency guarantees.", True, []),
+            flag("onboarding_flow", "New three-step onboarding flow replacing the legacy five-step wizard, instrumented for funnel comparison against the old flow.", True,
+                 [{"key": "control", "value": "control", "weight": 50},
+                  {"key": "new", "value": "new", "weight": 50}]),
+            flag("audit_logging", "Verbose audit logging for admin actions, kept on in production for compliance evidence retention.", True, []),
+        ],
+    }
+
+
+def load_state():
+    if os.path.exists(STATE_PATH):
+        with open(STATE_PATH, encoding="utf-8") as fh:
+            return json.load(fh)
+    state = seed_state()
+    save_state(state)
+    return state
+
+
+def save_state(state):
+    with open(STATE_PATH, "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=2)
+
+
+def apply_jq(data, expr):
+    """Apply a --jq filter: real jq when available, else a tiny subset."""
+    try:
+        proc = subprocess.run(["jq", "-c", expr], input=json.dumps(data),
+                              capture_output=True, text=True, timeout=10)
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+    # Fallback subset: length | .[].field | map({k, k2}) | {k, k2: [...]}
+    expr = expr.strip()
+    if expr == "length" and isinstance(data, list):
+        return str(len(data))
+    if expr.startswith(".[].") and isinstance(data, list):
+        field = expr[4:]
+        return json.dumps([item.get(field) for item in data])
+    if expr.startswith("map({") and expr.endswith("})") and isinstance(data, list):
+        fields = [f.strip() for f in expr[5:-2].split(",")]
+        return json.dumps([{f: item.get(f) for f in fields} for item in data])
+    return json.dumps(data)
+
+
+def emit(data, as_json, jq_expr):
+    if jq_expr:
+        print(apply_jq(data, jq_expr))
+    elif as_json:
+        print(json.dumps(data, indent=2))
+    elif isinstance(data, list):
+        for item in data:
+            print(item.get("name", json.dumps(item)))
+    elif isinstance(data, dict):
+        print(data.get("name", json.dumps(data)))
+
+
+def find_flag(state, name):
+    for f in state["flags"]:
+        if f["name"] == name:
+            return f
+    return None
+
+
+def parse(argv):
+    """Split global --json/--jq out of argv; return (rest, as_json, jq_expr)."""
+    rest, as_json, jq_expr = [], False, None
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--json":
+            as_json = True
+        elif a == "--jq" and i + 1 < len(argv):
+            jq_expr = argv[i + 1]
+            i += 1
+        elif a.startswith("--jq="):
+            jq_expr = a[len("--jq="):]
+        else:
+            rest.append(a)
+        i += 1
+    return rest, as_json, jq_expr
+
+
+def opt(argv, name, default=None):
+    for i, a in enumerate(argv):
+        if a == name and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith(name + "="):
+            return a[len(name) + 1:]
+    return default
+
+
+def main(argv):
+    args, as_json, jq_expr = parse(argv)
+    if not args:
+        print("mock flagsmith: no command", file=sys.stderr)
+        return 2
+    state = load_state()
+    cmd = args[0]
+
+    if cmd == "auth" and args[1:] == ["status"]:
+        emit({"user": "demo.user@example.com", "authenticated": True,
+              "method": "mock", "api_url": "https://api.flagsmith.com"}, as_json, jq_expr)
+        return 0
+
+    if cmd == "project" and args[1:2] == ["list"]:
+        emit([state["project"]], as_json, jq_expr)
+        return 0
+
+    if cmd == "environment" and args[1:2] == ["list"]:
+        emit(state["environments"], as_json, jq_expr)
+        return 0
+
+    if cmd == "segment" and args[1:2] == ["list"]:
+        emit(state["segments"], as_json, jq_expr)
+        return 0
+
+    if cmd == "flag" and args[1:2] == ["list"]:
+        emit(state["flags"], as_json, jq_expr)
+        return 0
+
+    if cmd == "flag" and args[1:2] == ["get"] and len(args) >= 3:
+        f = find_flag(state, args[2])
+        if not f:
+            print(f"flag not found: {args[2]}", file=sys.stderr)
+            return 1
+        emit(f, as_json, jq_expr)
+        return 0
+
+    if cmd == "flag" and args[1:2] in (["enable"], ["disable"]) and len(args) >= 3:
+        f = find_flag(state, args[2])
+        if not f:
+            print(f"flag not found: {args[2]}", file=sys.stderr)
+            return 1
+        f["enabled"] = args[1] == "enable"
+        save_state(state)
+        emit(f, as_json, jq_expr)
+        return 0
+
+    if cmd == "flag" and args[1:2] == ["update"] and len(args) >= 3:
+        f = find_flag(state, args[2])
+        if not f:
+            print(f"flag not found: {args[2]}", file=sys.stderr)
+            return 1
+        rest = args[3:]
+        for i, a in enumerate(rest):
+            if a == "--weight" and i + 1 < len(rest) and "=" in rest[i + 1]:
+                key, pct = rest[i + 1].split("=", 1)
+                pct = int(pct)
+                total_other = sum(v["weight"] for v in f["variants"] if v["key"] != key)
+                for v in f["variants"]:
+                    if v["key"] == key:
+                        v["weight"] = pct
+                # keep weights summing to 100 by absorbing into 'control'
+                diff = 100 - sum(v["weight"] for v in f["variants"])
+                for v in f["variants"]:
+                    if v["key"] == "control":
+                        v["weight"] += diff
+                _ = total_other
+            elif a == "--enable":
+                f["enabled"] = True
+            elif a == "--disable":
+                f["enabled"] = False
+        save_state(state)
+        emit(f, as_json, jq_expr)
+        return 0
+
+    if cmd == "feature" and args[1:2] == ["create"] and len(args) >= 3:
+        name = args[2]
+        if find_flag(state, name):
+            print(f"flag already exists: {name}", file=sys.stderr)
+            return 1
+        value = opt(args, "--value", "control")
+        enabled_raw = opt(args, "--enabled", "false")
+        enabled = enabled_raw is True or str(enabled_raw).lower() == "true"
+        desc = opt(args, "--description", "")
+        new_flag = {
+            "id": abs(hash(name)) % 90000 + 1000, "name": name, "description": desc,
+            "enabled": enabled, "default_enabled": enabled, "type": "MULTIVARIATE",
+            "variants": [{"key": "control", "value": value, "weight": 100}],
+            "tags": [], "created_at": "2026-11-26T00:00:00Z",
+            "updated_at": "2026-11-26T00:00:00Z", "created_by": "demo.user@example.com",
+            "project": 42, "multivariate_feature_state_values": [],
+            "feature_state_value": None, "is_archived": False,
+            "is_server_key_only": False, "hide_disabled_flags": False,
+            "owners": [], "grouped_feature_states": [], "external_resources": [],
+        }
+        state["flags"].append(new_flag)
+        save_state(state)
+        emit(new_flag, as_json, jq_expr)
+        return 0
+
+    if cmd == "feature" and args[1:3] == ["variant", "add"] and len(args) >= 4:
+        f = find_flag(state, args[3])
+        if not f:
+            print(f"flag not found: {args[3]}", file=sys.stderr)
+            return 1
+        key = opt(args, "--key", opt(args, "--value", "new"))
+        value = opt(args, "--value", key)
+        weight = int(opt(args, "--weight", "0"))
+        for v in f["variants"]:
+            if v["key"] == "control":
+                v["weight"] -= weight
+        f["variants"].append({"key": key, "value": value, "weight": weight})
+        save_state(state)
+        emit(f, as_json, jq_expr)
+        return 0
+
+    if cmd in ("eval", "evaluate") and len(args) >= 2:
+        f = find_flag(state, args[1])
+        if not f:
+            print(f"flag not found: {args[1]}", file=sys.stderr)
+            return 1
+        variant = "control"
+        for v in f["variants"]:
+            if v["key"] == "new" and v["weight"] >= 50:
+                variant = "new"
+        emit({"name": f["name"], "enabled": f["enabled"], "variant": variant}, as_json, jq_expr)
+        if "--test" in args:
+            return 0 if f["enabled"] else 1
+        return 0
+
+    print(f"mock flagsmith: unsupported command: {' '.join(args)}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
