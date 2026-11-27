@@ -10,6 +10,40 @@ Skills**. The skill follows the standard Agent Skills format (`SKILL.md` with
 YAML frontmatter + bundled scripts), so it loads in Claude Code and other
 skills-compatible agents unchanged.
 
+## Quickstart
+
+**1. Install the skill** — copy this directory into your agent's skills folder:
+
+```bash
+cp -r ship-it-safely ~/.claude/skills/        # Claude Code
+# or: cp -r ship-it-safely ~/.agents/skills/
+```
+
+**2. Try the demo (no Flagsmith account needed):**
+
+```bash
+bash demo/run-demo.sh
+```
+
+The demo replays the full workflow against a stateful mock of the Flagsmith
+CLI: one change ships cleanly (10 → 50 → 100, all health gates green) and one
+hits a forced gate failure at weight 10 and rolls back automatically. It
+writes a run journal and a report with the demo's token count.
+
+**3. For a real run** you need the Flagsmith CLI v2 (install via the official
+script, Homebrew, or GitHub releases — not the legacy npm package), then:
+
+```bash
+flagsmith login    # OAuth — or set FLAGSMITH_API_KEY (see .env.example)
+```
+
+**How Flagsmith is used:** the skill drives the Flagsmith CLI for everything —
+it creates a multivariate flag (`control`/`new` variants) around the change,
+ramps the `new` variant's weight 10 → 50 → 100 with a health gate after every
+step, and on a failed gate rolls back by setting `new=0` and disabling the
+flag. Full detail in *The workflow* and *Safety model* below; the complete
+install reference is in *Install the skill* further down.
+
 ## The workflow
 
 ```
